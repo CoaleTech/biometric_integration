@@ -10,11 +10,12 @@
   "column_break_uhnm",
   "employee",
   "section_break_crws",
+  "allow_user_in_all_devices",
   "devices",
   "ebkn_data_section",
+  "zkteco_enroll_data",
   "ebkn_enroll_data",
-  "column_break_euhy",
-  "ebkn_enroll_data_json"
+  "suprema_enroll_data"
  ],
  "fields": [
   {
@@ -42,16 +43,16 @@
    "fieldtype": "Section Break"
   },
   {
+   "depends_on": "eval:!doc.allow_user_in_all_devices",
    "fieldname": "devices",
    "fieldtype": "Table",
-   "label": "Devices",
+   "label": "Allowed Devices",
    "options": "Biometric Device User Detail"
   },
   {
-   "collapsible": 1,
    "fieldname": "ebkn_data_section",
    "fieldtype": "Section Break",
-   "label": "EBKN Data"
+   "label": "Enroll Data"
   },
   {
    "fieldname": "ebkn_enroll_data",
@@ -59,18 +60,26 @@
    "label": "EBKN Enroll Data"
   },
   {
-   "fieldname": "column_break_euhy",
-   "fieldtype": "Column Break"
+   "default": "0",
+   "fieldname": "allow_user_in_all_devices",
+   "fieldtype": "Check",
+   "label": "Allow User in All Devices"
   },
   {
-   "fieldname": "ebkn_enroll_data_json",
-   "fieldtype": "JSON",
-   "label": "EBKN Enroll Data JSON"
+   "fieldname": "zkteco_enroll_data",
+   "fieldtype": "Attach",
+   "label": "ZKTeco Enroll Data"
+  },
+  {
+   "fieldname": "suprema_enroll_data",
+   "fieldtype": "Attach",
+   "label": "Suprema Enroll Data"
   }
  ],
+ "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-12-26 22:56:12.402807",
+ "modified": "2025-06-09 13:58:00.915203",
  "modified_by": "Administrator",
  "module": "Biometric Integration",
  "name": "Biometric Device User",
@@ -90,6 +99,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "search_fields": "user_id,employee",
  "sort_field": "modified",
  "sort_order": "DESC",

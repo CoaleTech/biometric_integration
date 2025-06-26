@@ -89,35 +89,3 @@ def get_site_for_device(device_id):
     except Exception as e:
         logging.error(f"Error fetching site for device ID {device_id}: {str(e)}")
         return None
-
-def validate_and_update_device_site_map(doc, event=None):
-    """
-    Validate device ID uniqueness across sites and update or maintain the device-site mapping.
-
-    This function should be called from hooks (on_update and on_trash) in the Biometric Device DocType.
-    It ensures that a device ID is unique across sites and updates or removes it from the global mapping.
-
-    Args:
-        doc (Document): The Biometric Device document.
-        event (str): The event type (on_update, on_trash).
-    """
-    try:
-        logging.debug(f"Validating device ID {doc.name} for event {event}")
-        device_site_map = load_device_site_map()
-
-        if event == "on_update":
-            device_site_map[doc.name] = {
-                "site_name": frappe.local.site,
-                "disabled": doc.disabled or 0,
-                "has_pending_command": doc.has_pending_command or 0
-            }
-
-        elif event == "on_trash":
-            if doc.name in device_site_map:
-                device_site_map.pop(doc.name, None)
-
-        save_device_site_map(device_site_map)
-
-    except Exception as e:
-        logging.error(f"Error validating/updating device-site map: {str(e)}")
-        raise

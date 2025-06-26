@@ -1,138 +1,83 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
+# biometric_integration/services/listener.py
+
 import logging
-import socket
-import os
-from datetime import datetime
-import frappe
+import time
+from typing import Callable, Dict
+from urllib.parse import urlsplit
+
+from werkzeug.wrappers import Request, Response
+
+# Your application's request processor
 from biometric_integration.services.ebkn_processor import handle_ebkn
-import shlex
 
-# Determine dynamic paths
-bench_path = frappe.utils.get_bench_path()
+logger = logging.getLogger("biometric_listener")
 
-# Set log file path dynamically
-log_file_path = os.path.join(bench_path, "logs", "biometric_listener.log")
+# Route table to direct requests to the correct handler.
+_ROUTE_TABLE: Dict[str, Callable] = {
+    "/ebkn": handle_ebkn,
+}
 
-# Ensure logs directory exists
-os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+# --- Header Processing Logic (Restored from your original file) ---
+# This is the crucial part that was missing.
 
-# Logging setup
-logging.basicConfig(
-    filename=log_file_path,
-    level=logging.DEBUG,
-    format='%(asctime)s %(levelname)s: %(message)s'
-)
+def _get_header(headers: "Request.headers", key: str) -> str | None:
+    """Helper to tolerate different header casings (e.g., Dev-Id vs dev_id)."""
+    return headers.get(key) or headers.get(key.replace("_", "-"))
 
-def get_raw_data_dir():
-    raw_data_dir = os.path.join(bench_path, "sites", "assets", "biometric_assets", "raw_data_logs")
-    os.makedirs(raw_data_dir, exist_ok=True)
-    return raw_data_dir
+_CANON_KEYS = {
+    "request_code", "dev_id", "trans_id", "cmd_return_code",
+    "blk_no", "response_code", "cmd_code",
+}
 
-class BiometricRequestHandler(BaseHTTPRequestHandler):
-    """Middleware to route requests."""
+def _canonicalize_headers(headers: "Request.headers") -> Dict[str, str]:
+    """Creates a simple, clean dictionary of the headers we care about."""
+    out: Dict[str, str] = {}
+    for key in _CANON_KEYS:
+        value = _get_header(headers, key)
+        if value is not None:
+            out[key] = value
+    return out
 
-    def do_POST(self):
-        try:
-            raw_path = self.path
-            normalized_path = raw_path.split("://")[-1].split("/", 1)[-1]
-            normalized_path = f"/{normalized_path}"
+# --- Main Application (Context-Free) ---
+# This application runs without any Frappe context. Context is created on-demand
+# by the handler (e.g., handle_ebkn) when it calls init_site().
+@Request.application
+def application(request: Request) -> Response:
+    t0 = time.perf_counter()
+    path = request.path.rstrip("/")
+    if "://" in path:
+        path = urlsplit(path).path.rstrip("/")
 
-            if normalized_path == "/ebkn":
-                dev_id = self.headers.get("dev_id")
-                if not dev_id:
-                    # Missing device id: respond 400
-                    self.simple_response(400)
-                    return
-                    
-                self.pass_to_handler(handle_ebkn)
+    # Basic request validation
+    if request.method != "POST":
+        return Response("Invalid Method", status=405)
 
-            else:
-                # Unsupported path
-                self.simple_response(400)
+    handler = _ROUTE_TABLE.get(path)
+    if not handler:
+        return Response("Not Found", status=404)
 
-        except Exception as e:
-            logging.error(f"Error processing request: {str(e)}", exc_info=True)
-            self.simple_response(400)
-
-    def pass_to_handler(self, handler):
-        try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            raw_data = self.rfile.read(content_length)
-
-            # Call handler
-            response_body, status, response_headers = handler(self, raw_data, self.headers)
-
-            # Check if response_body is already bytes
-            if isinstance(response_body, bytes):
-                response_body_bytes = response_body
-            else:
-                response_body_bytes = response_body.encode('utf-8')
-
-            # Send response
-            self.send_response(status)
-            for header, value in response_headers.items():
-                self.send_header(header, value)
-            self.send_header("Content-Length", str(len(response_body_bytes)))
-            logging.info(f"Sending response content-length: {len(response_body_bytes)}")
-            self.send_header("Content-Type", "application/octet-stream")
-            self.end_headers()
-
-            # Save raw data if needed
-            try:
-                if True:  # Set to False to disable saving raw data
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    filename = f"raw_data_{timestamp}.bin"  # More descriptive filename
-                    save_path = os.path.join("/home/zima/frappe-bench/sites/assets/biometric_assets", filename)
-
-                    with open(save_path, "wb") as f:  # Open in binary write mode
-                        f.write(raw_data)  # Write raw binary data directly
-
-            except Exception as file_error:
-                logging.error(f"Error saving raw data: {str(file_error)}", exc_info=True)
-
-            # Write the response back to the client
-            self.wfile.write(response_body_bytes)
-            self.wfile.flush()
-
-        except Exception as e:
-            logging.error(f"Error in handler: {str(e)}", exc_info=True)
-            # On any handler error: respond 400
-            self.simple_response(400)
-
-    def simple_response(self, status_code=400):
-        """Send a simple minimal response with given status."""
-        self.send_response(status_code)
-        self.end_headers()
-
-class CustomHTTPServer(HTTPServer):
-    def server_bind(self):
-        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        super().server_bind()
-
-def start_listener(port=8998):
-    server_address = ('', port)
-    httpd = CustomHTTPServer(server_address, BiometricRequestHandler)
-    logging.info(f"Starting server on port {port}")
+    # Process the request
     try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        logging.info("Shutting down server gracefully...")
-        httpd.shutdown()
-        logging.info("Server stopped.")
+        # THE FIX: We now prepare canonical headers and pass them as the third argument.
+        raw_body = request.get_data(cache=False)
+        canon_hdrs = _canonicalize_headers(request.headers)
+        
+        body_out, status, extra_headers = handler(request, raw_body, canon_hdrs)
 
-def save_raw_data(raw_data, request_code, device_id):
-    try:
-        save_dir = get_raw_data_dir()
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        request_code = request_code or "unknown"
-        device_id = device_id or "unknown"
+    except Exception:
+        logger.exception("Biometric processor raised an unhandled exception")
+        return Response("Internal Server Error", status=500)
 
-        filename = f"{timestamp}_{request_code}_{device_id}.bin"
-        file_path = os.path.join(save_dir, filename)
-        with open(file_path, "wb") as file:
-            file.write(raw_data)
+    # Build and return the response
+    body_bytes = body_out if isinstance(body_out, (bytes, bytearray)) else str(body_out).encode()
+    response = Response(body_bytes, status=status)
+    response.headers["Content-Type"] = "application/octet-stream"
+    response.headers["Content-Length"] = str(len(body_bytes))
+    for k, v in extra_headers.items():
+        response.headers[k] = v
 
-        logging.info(f"Raw data saved to {file_path}")
-
-    except Exception as e:
-        logging.error(f"Failed to save raw data: {str(e)}")
+    logger.info(
+        "%s %s %s %d %.1fms",
+        request.remote_addr, request.method, path, status, (time.perf_counter() - t0) * 1000
+    )
+    return response

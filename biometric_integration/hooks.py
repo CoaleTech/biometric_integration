@@ -83,13 +83,13 @@ app_license = "mit"
 # ------------
 
 # before_install = "biometric_integration.install.before_install"
-# after_install = "biometric_integration.install.after_install"
+after_install = "biometric_integration.utils.installation.before_uninstall"
 
 # Uninstallation
 # ------------
 
-# before_uninstall = "biometric_integration.uninstall.before_uninstall"
-after_uninstall = "biometric_integration.utils.uninstall.cleanup"
+before_uninstall = "biometric_integration.utils.installation.before_uninstall"
+after_uninstall = "biometric_integration.utils.installation.after_uninstall"
 
 # Integration Setup
 # ------------------
@@ -242,9 +242,4 @@ after_uninstall = "biometric_integration.utils.uninstall.cleanup"
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
 
-doc_events = {
-    "Biometric Device": {
-        "on_update": "biometric_integration.services.device_mapping.validate_and_update_device_site_map",
-        "on_trash": "biometric_integration.services.device_mapping.validate_and_update_device_site_map",
-    }
-}
+console_scripts = ["biometric-listener=biometric_integration.cli:main"]

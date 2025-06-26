@@ -42,7 +42,7 @@ def create_employee_checkin(employee_field_value, timestamp, device_id=None, log
         checkin.device_id = device_id
 
         # Insert the document into the database
-        checkin.insert()
+        checkin.insert(ignore_mandatory=True)
         frappe.db.commit()
         destroy_site()
         logging.info(f"Check-in successfully created for Employee {employee_id} at {timestamp}")

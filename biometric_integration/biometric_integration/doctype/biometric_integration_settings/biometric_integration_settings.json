@@ -11,7 +11,18 @@
   "employee_id_mapping_method",
   "device_id_field",
   "clean_id_regex",
-  "example_cleaned_ids"
+  "example_cleaned_ids",
+  "section_break_ajkm",
+  "do_not_skip_unknown_employee_checkin",
+  "column_break_aprg",
+  "listener_section",
+  "listener_enabled",
+  "listener_status",
+  "listener_port",
+  "column_break_fcrp",
+  "zkteco_webhook_url",
+  "ebkn_webhook_url",
+  "suprema_webhook_url"
  ],
  "fields": [
   {
@@ -62,12 +73,68 @@
    "fieldname": "maximum_no_of_attempts_for_commands",
    "fieldtype": "Int",
    "label": "Maximum No of Attempts for Commands"
+  },
+  {
+   "fieldname": "section_break_ajkm",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "description": "If an Employee ID in the device could not be found in the ERPNext, it will by default skip creating checkin, if you check this, it will create checkins without an Employee.",
+   "fieldname": "do_not_skip_unknown_employee_checkin",
+   "fieldtype": "Check",
+   "label": "Do Not Skip Unknown Employee Checkin"
+  },
+  {
+   "fieldname": "column_break_aprg",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "listener_section",
+   "fieldtype": "Section Break",
+   "label": "Listener"
+  },
+  {
+   "default": "0",
+   "fieldname": "listener_enabled",
+   "fieldtype": "Check",
+   "label": "Listener Enabled"
+  },
+  {
+   "fieldname": "listener_status",
+   "fieldtype": "Read Only",
+   "label": "Listener Status"
+  },
+  {
+   "fieldname": "listener_port",
+   "fieldtype": "Read Only",
+   "label": "Listener Port"
+  },
+  {
+   "fieldname": "column_break_fcrp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "zkteco_webhook_url",
+   "fieldtype": "Read Only",
+   "label": "ZKTeco Webhook URL"
+  },
+  {
+   "fieldname": "ebkn_webhook_url",
+   "fieldtype": "Read Only",
+   "label": "EBKN Webhook URL"
+  },
+  {
+   "fieldname": "suprema_webhook_url",
+   "fieldtype": "Read Only",
+   "label": "Suprema Webhook URL"
   }
  ],
+ "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-12-20 21:54:50.615982",
+ "modified": "2025-06-11 21:25:21.015763",
  "modified_by": "Administrator",
  "module": "Biometric Integration",
  "name": "Biometric Integration Settings",
@@ -84,6 +151,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
