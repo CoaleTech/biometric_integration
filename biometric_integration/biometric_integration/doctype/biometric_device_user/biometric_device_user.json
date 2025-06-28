@@ -9,6 +9,7 @@
   "user_id",
   "column_break_uhnm",
   "employee",
+  "employee_name",
   "section_break_crws",
   "allow_user_in_all_devices",
   "devices",
@@ -74,12 +75,20 @@
    "fieldname": "suprema_enroll_data",
    "fieldtype": "Attach",
    "label": "Suprema Enroll Data"
+  },
+  {
+   "fetch_from": "employee.employee_name",
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "in_filter": 1,
+   "in_list_view": 1,
+   "label": "Employee Name"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-06-09 13:58:00.915203",
+ "modified": "2025-06-28 14:37:11.901959",
  "modified_by": "Administrator",
  "module": "Biometric Integration",
  "name": "Biometric Device User",
@@ -104,5 +113,5 @@
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "title_field": "employee"
+ "title_field": "employee_name"
 }

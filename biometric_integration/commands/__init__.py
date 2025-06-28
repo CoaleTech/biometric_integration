@@ -1,84 +1,91 @@
-# biometric_integration/commands/__init__.py
-
 import click
-import subprocess
-from biometric_integration.services.common_conf import get_port, set_port
-from biometric_integration.services.supervisor_util import (
-    add_program,
-    remove_program,
-    program_exists,
-    PROGRAM_NAME
+import frappe
+import json
+
+from biometric_integration.commands.utils import (
+    enable_listener_logic,
+    disable_listener_logic,
+    get_status_logic,
+    get_config_key, # FIX: Import the correct, public function name
+    LISTENER_PORT_KEY
 )
 
-# --- Helper to show status ---
-def _show_status():
-    ctx = click.get_current_context()
-    ctx.invoke(status)
+from frappe.commands import pass_context
 
-# --- Command Group Definition ---
 @click.group("biometric-listener")
 def listener():
-    """Enable, disable, or check the status of the biometric listener service."""
+    """Manage NGINX listeners for biometric devices."""
     pass
 
-# --- Enable Command ---
 @listener.command("enable")
-@click.option("-p", "--port", type=int, help="Custom TCP port (default 8998).")
-def enable(port: int | None):
-    """Adds the listener to Supervisor and starts it."""
-    if program_exists():
-        click.secho("Listener is already enabled. Showing status.", fg="yellow")
-        _show_status()
+@click.option("--port", type=int, help="The port to listen on. Reads from site_config.json if omitted.")
+@pass_context
+def enable(context, port):
+    """Enables the NGINX listener for a site. The site is specified via the global --site flag."""
+    try:
+        site = context.sites[0]
+    except IndexError:
+        click.secho("Error: Please specify a site using: bench --site SITENAME biometric-listener enable", fg="red")
         return
-
-    port_to_set = port or get_port()
-    set_port(port_to_set)
-    click.echo(f"Enabling listener on port {port_to_set}...")
-    add_program(port_to_set)
-    click.secho("Listener enabled successfully. Current status:", fg="green")
-    _show_status()
-
-# --- Disable Command ---
-@listener.command("disable")
-def disable():
-    """Stops and removes the listener from Supervisor."""
-    if not program_exists():
-        click.secho("Listener is not enabled. Nothing to do.", fg="yellow")
-        return
-
-    click.echo("Disabling listener...")
-    remove_program()
-    click.secho("Listener disabled successfully.", fg="green")
-
-# --- Status Command ---
-@listener.command("status")
-def status():
-    """Checks the running state and configuration of the listener."""
-    if not program_exists():
-        click.secho("Listener is not configured.", fg="red")
-        click.echo("Use 'bench biometric-listener enable' to set it up.")
-        return
-
-    port = get_port()
-    click.echo(click.style("Biometric Listener Status", bold=True))
-    click.echo(f"─" * 30)
-    click.echo(f"Port           : {port}")
     
     try:
-        # Check supervisor for the running state
-        output = subprocess.check_output(["supervisorctl", "status", PROGRAM_NAME], text=True)
-        state = output.split()[1]
-        pid_info = " ".join(output.split()[2:])
-        if state == "RUNNING":
-            click.echo(f"Service State  : {click.style(state, fg='green')} ({pid_info})")
-        else:
-            click.echo(f"Service State  : {click.style(state, fg='red')} ({pid_info})")
+        frappe.connect(site=site)
+        
+        # FIX: Use the correct function to read from config
+        if not port:
+            port = get_config_key(LISTENER_PORT_KEY)
+        
+        if not port:
+            click.secho("Error: --port is required when no port is set in site_config.json", fg="red")
+            return
 
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        click.echo(f"Service State  : {click.style('UNKNOWN', fg='red')} (Could not query supervisor)")
+        success, message = enable_listener_logic(site, port)
+        click.secho(message, fg="green" if success else "red")
+    except Exception as e:
+        click.secho(f"An error occurred on site {site}: {e}", fg="red")
+    finally:
+        if frappe.local.db:
+            frappe.destroy()
+
+@listener.command("disable")
+@pass_context
+def disable(context):
+    """Disables the NGINX listener for a site. The site is specified via the global --site flag."""
+    try:
+        site = context.sites[0]
+    except IndexError:
+        click.secho("Error: Please specify a site using: bench --site SITENAME biometric-listener disable", fg="red")
+        return
+
+    try:
+        frappe.connect(site=site)
+        success, message = disable_listener_logic(site)
+        click.secho(message, fg="green" if success else "red")
+    except Exception as e:
+        click.secho(f"An error occurred on site {site}: {e}", fg="red")
+    finally:
+        if frappe.local.db:
+            frappe.destroy()
+
+@listener.command("status")
+@pass_context
+def status(context):
+    """Checks the status of biometric listeners. Use --site to check a specific site, or no flag for all sites."""
+    sites_to_check = context.sites or frappe.utils.get_sites()
+    all_statuses = {}
+
+    for s in sites_to_check:
+        try:
+            frappe.connect(site=s)
+            all_statuses[s] = get_status_logic(s)
+        except Exception as e:
+            all_statuses[s] = {"status": "error", "message": str(e)}
+        finally:
+            if frappe.local.db:
+                frappe.destroy()
     
-    click.echo(f"─" * 30)
+    click.echo(json.dumps(all_statuses, indent=2))
 
 
-# Expose commands to the bench CLI
+# This is the entry point that bench will discover
 commands = [listener]

@@ -83,12 +83,12 @@ app_license = "mit"
 # ------------
 
 # before_install = "biometric_integration.install.before_install"
-after_install = "biometric_integration.utils.installation.before_uninstall"
+# after_install = "biometric_integration.utils.installation.before_uninstall"
 
 # Uninstallation
 # ------------
 
-before_uninstall = "biometric_integration.utils.installation.before_uninstall"
+# before_uninstall = "biometric_integration.utils.installation.before_uninstall"
 after_uninstall = "biometric_integration.utils.installation.after_uninstall"
 
 # Integration Setup

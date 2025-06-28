@@ -9,14 +9,14 @@
   "biometric_device",
   "biometric_device_user",
   "employee",
+  "employee_name",
   "brand",
-  "no_of_attempts",
-  "last_sent_data_block",
   "column_break_yfdy",
   "command_type",
   "status",
   "initiated_on",
   "closed_on",
+  "no_of_attempts",
   "response_section",
   "device_response"
  ],
@@ -90,7 +90,8 @@
    "fieldname": "no_of_attempts",
    "fieldtype": "Int",
    "label": "No of Attempts",
-   "no_copy": 1
+   "no_copy": 1,
+   "read_only": 1
   },
   {
    "collapsible": 1,
@@ -106,18 +107,16 @@
    "read_only": 1
   },
   {
-   "depends_on": "eval:doc.brand == \"EBKN\"",
-   "fieldname": "last_sent_data_block",
-   "fieldtype": "Int",
-   "label": "Last Sent Data Block",
-   "no_copy": 1,
-   "read_only": 1
+   "fetch_from": "employee.employee_name",
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "label": "Employee Name"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-06-09 14:56:31.131860",
+ "modified": "2025-06-28 14:38:01.478868",
  "modified_by": "Administrator",
  "module": "Biometric Integration",
  "name": "Biometric Device Command",
