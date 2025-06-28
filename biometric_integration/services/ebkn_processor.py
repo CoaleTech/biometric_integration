@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import json
-import logging
 import os
 import struct
 import typing
@@ -16,22 +15,10 @@ from frappe.utils import get_bench_path, now, now_datetime
 # FIX: Changed the relative import to a robust absolute import.
 # This resolves the "No module named 'biometric_integration.doctype'" error.
 from biometric_integration.biometric_integration.doctype.biometric_integration_settings.biometric_integration_settings import get_erp_employee_id
-from .command_processor import process_device_command
-from .create_checkin import create_employee_checkin
-from .device_mapping import get_biometric_assets_dir
-
-# --- Logger Setup ---
-LOG_FILE = os.path.join(get_bench_path(), "logs", "biometric_listener.log")
-logger = logging.getLogger("biometric_listener")
-logger.setLevel(logging.INFO)
-
-if not logger.handlers:
-    handler = logging.FileHandler(LOG_FILE)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-# --- End Logger Setup ---
-
+from biometric_integration.services.command_processor import process_device_command
+from biometric_integration.services.create_checkin import create_employee_checkin
+from biometric_integration.services.device_mapping import get_biometric_assets_dir
+from biometric_integration.services.logger import logger
 
 # --- Constants & helpers ---
 BENCH_ASSETS_DIR = get_biometric_assets_dir()
@@ -213,9 +200,7 @@ def _handle_receive_cmd(payload: dict, headers: Dict[str, str], raw: bytes) -> R
         body_bytes = _format_cmd_body(cmd.get("body"))
         trans_id = cmd.get("trans_id") or trans_id
         cmd_code = cmd.get("cmd_code", "")
-        extra = {"blk_no": str(cmd["blk_no"])} if cmd.get("blk_no") else {}
-        logger.info(f"Sending command {cmd_code} to {dev_id} with raw body {body_bytes}")
-        return reply_response_code("OK", trans_id=trans_id, cmd_code=cmd_code, body=body_bytes, **extra)
+        return reply_response_code("OK", trans_id=trans_id, cmd_code=cmd_code, body=body_bytes)
     except Exception as exc:
         logger.error("receive_cmd failed for %s: %s", dev_id, exc, exc_info=True)
         return reply_response_code("ERROR")

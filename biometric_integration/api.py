@@ -1,83 +1,87 @@
-import frappe
-from frappe.utils import get_bench_path
-from werkzeug.wrappers import Response
-from urllib.parse import urlparse, unquote
-import logging
-import os
-import json
+# Copyright (c) 2024-2025, Khaled Bin Amir
+# SPDX-License-Identifier: MIT
 
-# Import the device request handlers for each brand
+import frappe
+from werkzeug.wrappers import Response
+from urllib.parse import urlparse
+
+# Use full paths for robust imports as required by the Frappe framework.
 from biometric_integration.services.ebkn_processor import handle_ebkn
 from biometric_integration.services.zkteco_processor import handle_zkteco
+from biometric_integration.services.logger import logger # Import the centralized logger
 
-# --- Logger Setup ---
-LOG_FILE = os.path.join(get_bench_path(), "logs", "biometric_listener.log")
-logger = logging.getLogger("biometric_listener_api")
-logger.setLevel(logging.INFO)
-if not logger.handlers:
-    handler = logging.FileHandler(LOG_FILE)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-# --- End Logger Setup ---
-
-# --- Header Transformation Map (for EBKN) ---
+# --- Header Transformation Map ---
+# Provides a compatibility layer for Nginx, which may alter header names.
 NGINX_TO_ORIGINAL_HEADERS = {
     "x-request-code": "request_code",
     "x-dev-id": "dev_id",
-    # ... other headers
-}
-
-# --- Brand to Handler Router ---
-# Maps URL paths to their corresponding handler function.
-REQUEST_ROUTER = {
-    "/ebkn": handle_ebkn,
-    "/iclock/cdata": handle_zkteco,
-    "/iclock/getrequest": handle_zkteco,
-    "/iclock/devicecmd": handle_zkteco,
+    "x-trans-id": "trans_id",
+    "x-cmd-return-code": "cmd_return_code",
+    "x-blk-no": "blk_no",
 }
 
 @frappe.whitelist(allow_guest=True)
 def handle_request():
     """
-    Single entry point for all biometric device requests. It routes requests
-    to the appropriate brand processor based on the URL path.
+    Acts as the single entry point for all incoming biometric device requests.
+    It routes requests to the appropriate brand-specific processor based on the URL path.
     """
     original_user = frappe.session.user
     request = frappe.local.request
-    
-    # Use the raw URI from Nginx to get the path
+
     original_uri = request.headers.get('X-Original-Request-URI', '/')
     parsed_path = urlparse(original_uri).path
 
-    # Concise logging for every request
-    log_info = f"Request from {request.remote_addr} on path {parsed_path}"
-    if request.args:
-        log_info += f" with params: {dict(request.args)}"
-    logger.info(log_info)
+    logger.info(f"Request from {request.headers.get('X-Forwarded-For', request.remote_addr)} Path: '{parsed_path}' Headers: {dict(request.headers)}")
 
     try:
         frappe.set_user("Administrator")
-        
-        # Find the correct handler based on the path
-        handler = REQUEST_ROUTER.get(parsed_path)
-        if not handler:
-            logger.warning(f"No handler found for path: {parsed_path}")
-            return Response(f"No handler found for path: {parsed_path}", status=404)
 
-        # Reconstruct headers for EBKN protocol if needed
+        handler = None
+        is_ebkn = False
+        if parsed_path.startswith('/iclock/'):
+            handler = handle_zkteco
+        elif parsed_path == '/ebkn' or parsed_path == '/ebkn/':
+            handler = handle_ebkn
+            is_ebkn = True
+        
+        if not handler:
+            logger.warning(f"No registered handler for path: {parsed_path}")
+            return Response(f"No handler for path: {parsed_path}", status=404)
+
         reconstructed_headers = dict(request.headers)
-        if parsed_path.startswith('/ebkn'):
+        if is_ebkn:
             for nginx_header, original_header in NGINX_TO_ORIGINAL_HEADERS.items():
                 if nginx_header in request.headers:
                     reconstructed_headers[original_header] = request.headers[nginx_header]
+
+        raw_body = request.get_data(cache=False)
         
         # Execute the handler
-        raw_body = request.get_data(cache=False)
-        return handler(request, raw_body, reconstructed_headers)
+        handler_output = handler(request, raw_body, reconstructed_headers)
+
+        # --- RESPONSE ADAPTER ---
+        # This block correctly handles the different return types from each processor.
+        if is_ebkn and isinstance(handler_output, tuple):
+            # The EBKN handler returns a tuple (body, status, headers).
+            # We must construct a proper Response object from it.
+            body, status, headers = handler_output
+            response = Response(body, status=status, headers=headers, content_type='application/octet-stream')
+        elif isinstance(handler_output, Response):
+            # The ZKTeco handler already returns a complete Response object.
+            response = handler_output
+        else:
+            # Fallback for unexpected return types.
+            logger.error(f"Handler for {parsed_path} returned an invalid type: {type(handler_output)}")
+            return Response("Internal Server Error: Invalid handler response", status=500)
+
+        logger.info(f"Response for {parsed_path}: Status: {response.status_code} Headers: {dict(response.headers)}")
+        return response
 
     except Exception as e:
-        logger.error(f"Biometric API request failed on path {parsed_path}", exc_info=True)
+        logger.error(f"Error handling request for path {parsed_path}", exc_info=True)
         return Response("Internal Server Error", status=500)
     finally:
         frappe.set_user(original_user or "Guest")
+        frappe.db.commit()
+

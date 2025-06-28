@@ -1,104 +1,167 @@
+# Copyright (c) 2024-2025, Khaled Bin Amir
+# SPDX-License-Identifier: MIT
+
 from __future__ import annotations
-import json
 import frappe
-from typing import Optional
+from frappe.utils.file_manager import get_file
 from frappe.utils import now, now_datetime, cint
+from typing import Optional, Dict, Any, Union
+import json
+import base64
 
-# --- EBKN-specific command builders ---
+# Use full paths for robust imports as required by the Frappe framework.
+from biometric_integration.services.logger import logger
 
-def _load_ebkn_blob(url: str) -> Optional[bytes]:
-    """Loads a file's content by its URL for EBKN."""
-    if not url: return None
-    try:
-        file_name = frappe.db.get_value("File", {"file_url": url}, "name")
-        if file_name:
-            return frappe.get_doc("File", file_name).get_content()
-        else:
-            frappe.log_error(title="File Not Found in DB", message=f"Could not find a File document for URL: {url}")
-            return None
-    except Exception:
-        frappe.log_error(title="Blob Load Exception", message=frappe.get_traceback())
+# --- Main Public Function ---
+
+def process_device_command(device_sn: str) -> Optional[Union[str, dict]]:
+    """
+    Fetches the next pending command and builds the brand-specific command payload.
+    This function acts as an adapter, returning the correct format for each brand.
+    """
+    command_name = frappe.db.get_value(
+        "Biometric Device Command",
+        {"biometric_device": device_sn, "status": "Pending"},
+        "name",
+        order_by="creation asc"
+    )
+
+    if not command_name:
         return None
 
-def _delete_user_ebkn(cmd, user) -> dict:
-    body = json.dumps({"user_id": f"{int(user.user_id):0>8}"})
-    return {"trans_id": cmd.name, "cmd_code": "DELETE_USER", "body": body}
+    cmd_doc = frappe.get_doc("Biometric Device Command", command_name)
+    
+    try:
+        payload = _build_command_payload(cmd_doc)
+        if payload:
+            cmd_doc.no_of_attempts += 1
+            cmd_doc.save(ignore_permissions=True)
+            frappe.db.commit()
+            return payload
+        else:
+            # The error is handled and logged inside the build function.
+            return None
+            
+    except Exception as e:
+        # Catch any unexpected critical errors during payload processing.
+        _handle_command_build_failure(cmd_doc, e, "Critical Command Processing Failure")
+        return None
 
-def _set_user_info_ebkn(cmd, user) -> Optional[dict]:
-    blob = _load_ebkn_blob(user.ebkn_enroll_data)
-    if not blob:
-        raise FileNotFoundError(f"EBKN enrollment blob not found for user {user.name}")
-    return {"trans_id": cmd.name, "cmd_code": "SET_USER_INFO", "body": blob}
+# --- Command Building Logic ---
 
-def _get_user_info_ebkn(cmd, user) -> dict:
-    body = json.dumps({"user_id": f"{int(user.user_id):0>8}"})
-    return {"trans_id": cmd.name, "cmd_code": "GET_USER_INFO", "body": body}
+def _build_command_payload(cmd_doc: frappe.Document) -> Optional[Union[str, dict]]:
+    """Routes to the correct builder based on brand and handles exceptions."""
+    try:
+        user_doc = frappe.get_doc("Biometric Device User", cmd_doc.biometric_device_user)
+        
+        if cmd_doc.brand == "EBKN":
+            return _build_ebkn_payload(cmd_doc, user_doc)
+        elif cmd_doc.brand == "ZKTeco":
+            return _build_zkteco_command(cmd_doc, user_doc)
+        else:
+            raise ValueError(f"Unsupported brand: {cmd_doc.brand}")
 
-# --- ZKTeco-specific command builders ---
+    except Exception as e:
+        _handle_command_build_failure(cmd_doc, e, "Command Build Failed")
+        return None
 
-def _build_zkteco_command(cmd, user) -> Optional[str]:
-    """Builds a command string for a ZKTeco device."""
-    user_pin = user.user_id
-    if cmd.command_type == "Enroll User":
-        return f"C:{cmd.name}:DATA UPDATE USERINFO PIN={user_pin}\tName={user.get('employee_name') or user_pin}"
-    if cmd.command_type == "Delete User":
-        return f"C:{cmd.name}:DATA DELETE USERINFO PIN={user_pin}"
-    if cmd.command_type == "Get Enroll Data":
-        return f"C:{cmd.name}:DATA QUERY USERINFO PIN={user_pin}"
+def _build_ebkn_payload(cmd_doc: frappe.Document, user_doc: frappe.Document) -> Optional[dict]:
+    """Builds a command payload dictionary for the EBKN brand."""
+    cmd_type = cmd_doc.command_type
+
+    if cmd_type == "Delete User":
+        body = json.dumps({"user_id": f"{int(user_doc.user_id):0>8}"})
+        return {"trans_id": cmd_doc.name, "cmd_code": "DELETE_USER", "body": body}
+
+    if cmd_type == "Get Enroll Data":
+        body = json.dumps({"user_id": f"{int(user_doc.user_id):0>8}"})
+        return {"trans_id": cmd_doc.name, "cmd_code": "GET_USER_INFO", "body": body}
+    
+    if cmd_type == "Enroll User":
+        blob = _load_blob(user_doc.ebkn_enroll_data)
+        if not blob:
+            raise FileNotFoundError(f"EBKN enrollment data not found for user {user_doc.name}")
+        return {"trans_id": cmd_doc.name, "cmd_code": "SET_USER_INFO", "body": blob}
+        
     return None
 
-# --- Main Logic ---
+def _build_zkteco_command(cmd_doc: frappe.Document, user_doc: frappe.Document) -> Optional[str]:
+    """Builds a command string for the ZKTeco brand."""
+    cmd_type = cmd_doc.command_type
+    cmd_id = cmd_doc.name
+    user_pin = user_doc.user_id
+    user_name = user_doc.employee_name
 
-def _handle_command_build_failure(cmd, exc: Exception):
-    """Handles exceptions during command building."""
+    if cmd_type == "Delete User":
+        return f"C:{cmd_id}:DATA DELETE USERINFO PIN={user_pin}"
+
+    if cmd_type == "Get Enroll Data":
+        user_cmd = f"C:{cmd_id}:DATA QUERY USERINFO PIN={user_pin}"
+        fp_cmd = f"C:{cmd_id}:DATA QUERY FPTMP PIN={user_pin}"
+        return "\n".join([user_cmd, fp_cmd])
+
+    if cmd_type == "Enroll User":
+        blob = _load_blob(user_doc.zkteco_enroll_data)
+        if not blob:
+            raise FileNotFoundError(f"ZKTeco enrollment data not found for user {user_doc.name}")
+        
+        template_b64 = base64.b64encode(blob).decode('utf-8')
+        user_info_cmd = f"C:{cmd_id}:DATA UPDATE USERINFO PIN={user_pin}\tName={user_name}\tPri=0"
+        fp_data_cmd = f"C:{cmd_id}:DATA UPDATE FINGERPRINT PIN={user_pin}\tFID=0\tSize={len(blob)}\tValid=1\tTMP={template_b64}"
+        return "\n".join([user_info_cmd, fp_data_cmd])
+        
+    return None
+
+# --- Helper Functions ---
+
+def _load_blob(url: str) -> Optional[bytes]:
+    """Loads a file's content by its URL, ensuring bytes are returned."""
+    if not url: return None
+    file_name = frappe.db.get_value("File", {"file_url": url}, "name")
+    if file_name:
+        content = frappe.get_doc("File", file_name).get_content()
+        return content if isinstance(content, bytes) else content.encode('utf-8')
+    # This is a critical error, so it will be caught and logged by the calling function.
+    logger.error(f"File Not Found for URL: {url}")
+    return None
+
+def _handle_command_build_failure(cmd_doc: frappe.Document, exc: Exception, title: str):
+    """
+    Handles exceptions during command building by updating the command doc and
+    logging a critical error for the administrator to review.
+    """
     try:
         frappe.db.rollback()
-        cmd.reload()
-        cmd.no_of_attempts = (cmd.no_of_attempts or 0) + 1
-        error_line = f"[{now()}] Build Failed: {str(exc)}"
-        cmd.device_response = (f"{cmd.device_response}\n{error_line}" if cmd.device_response else error_line)
+        cmd_doc.reload()
+        cmd_doc.no_of_attempts = (cmd_doc.no_of_attempts or 0) + 1
+        error_line = f"[{now()}] Build Failed: {exc}"
+        cmd_doc.device_response = (f"{cmd_doc.device_response}\n{error_line}" if cmd_doc.device_response else error_line)
         
         settings = frappe.get_cached_doc("Biometric Integration Settings")
         max_attempts = cint(settings.get("maximum_no_of_attempts_for_commands")) or 3
-        if cmd.no_of_attempts >= max_attempts:
-            cmd.status = "Failed"
-            cmd.closed_on = now_datetime()
-        cmd.save(ignore_permissions=True)
+
+        if cmd_doc.no_of_attempts >= max_attempts:
+            cmd_doc.status = "Failed"
+            cmd_doc.closed_on = now_datetime()
+        else:
+            # Reset to Pending if there are attempts left for a retry.
+            cmd_doc.status = "Pending"
+
+        cmd_doc.save(ignore_permissions=True)
         frappe.db.commit()
-    except Exception as e:
-        frappe.log_error(f"Critical error in _handle_command_build_failure: {e}", "Command Processor")
-
-def _build(cmd) -> Optional[dict | str]:
-    """Tries to build a command. On failure, logs the error and returns None."""
-    try:
-        user = frappe.get_doc("Biometric Device User", cmd.biometric_device_user)
         
-        if cmd.brand == "EBKN":
-            if cmd.command_type == "Delete User": return _delete_user_ebkn(cmd, user)
-            if cmd.command_type == "Enroll User": return _set_user_info_ebkn(cmd, user)
-            # FIX: Restored the "Get Enroll Data" command for EBKN.
-            if cmd.command_type == "Get Enroll Data": return _get_user_info_ebkn(cmd, user)
-        
-        elif cmd.brand == "ZKTeco":
-            return _build_zkteco_command(cmd, user)
-
-    except Exception as exc:
-        _handle_command_build_failure(cmd, exc)
-    return None
-
-def process_device_command(device_id: str) -> Optional[dict | str]:
-    """Fetches and processes the next pending command for a device."""
-    try:
-        name = frappe.db.get_value(
-            "Biometric Device Command",
-            {"biometric_device": device_id, "status": "Pending"},
-            "name",
-            order_by="creation"
+        # Log this as a critical error in Frappe's Error Log.
+        frappe.log_error(
+            title=title,
+            message=frappe.get_traceback(),
+            reference_doctype="Biometric Device Command",
+            reference_name=cmd_doc.name
         )
-        if not name:
-            return None
-        cmd = frappe.get_doc("Biometric Device Command", name)
-        return _build(cmd)
-    except Exception as exc:
-        frappe.log_error(f"process_device_command failed: {exc}", "Command Processor")
-        return None
+    except Exception as e:
+        # Log a failure within the error handler itself.
+        logger.error(
+            f"Critical Failure in Command Error Handler for {cmd_doc.name}: {e}",
+            exc_info=True
+        )
+        frappe.db.rollback()
+
