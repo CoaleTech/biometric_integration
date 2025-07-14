@@ -60,7 +60,7 @@ This is a one-time setup step that configures Nginx. Choose a port that is not c
 From your `frappe-bench` directory, run the following command:
 
 ```bash
-bench biometric-listener --port 8998
+bench biometric-listener enable --port 8998
 ```
 
 This command will automatically add the required server block to your Nginx configuration and reload Nginx to apply the changes.
