@@ -8,15 +8,9 @@
   "force_close_after",
   "maximum_no_of_attempts_for_commands",
   "column_break_yjgs",
-  "employee_id_mapping_method",
   "device_id_field",
-  "clean_id_regex",
-  "example_cleaned_ids",
-  "section_break_ajkm",
   "do_not_skip_unknown_employee_checkin",
-  "column_break_aprg",
   "listener_section",
-  "listener_enabled",
   "listener_status",
   "listener_port",
   "column_break_fcrp",
@@ -38,45 +32,17 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "Use Device ID Field",
-   "fieldname": "employee_id_mapping_method",
-   "fieldtype": "Select",
-   "label": "Employee ID Mapping Method",
-   "options": "Use Device ID Field\nClean Employee ID with Regex"
-  },
-  {
    "default": "attendance_device_id",
-   "depends_on": "eval:doc.employee_id_mapping_method == \"Use Device ID Field\"",
-   "description": "Enter the field name used for the attendance device ID (default: attendance_device_id). This field will be queried to map employees.",
+   "description": "Enter the Employee DocType field name used for the attendance device ID (default: attendance_device_id). This field will be queried to map employees.",
    "fieldname": "device_id_field",
    "fieldtype": "Data",
    "label": "Device ID Field"
-  },
-  {
-   "depends_on": "eval:doc.employee_id_mapping_method == \"Clean Employee ID with Regex\"",
-   "description": "Enter a regex pattern to clean the Employee ID for device compatibility. Ensure that after cleaning, the <b>ID remains unique</b> to enable reverse mapping back to the Employee ID.<br>For example, use ^[^\\d]+ to strip non-numeric prefixes.",
-   "fieldname": "clean_id_regex",
-   "fieldtype": "Data",
-   "ignore_xss_filter": 1,
-   "label": "Clean ID RegEx",
-   "mandatory_depends_on": "eval:doc.employee_id_mapping_method == \"Clean Employee ID with Regex\""
-  },
-  {
-   "depends_on": "eval:doc.employee_id_mapping_method == \"Clean Employee ID with Regex\"",
-   "fieldname": "example_cleaned_ids",
-   "fieldtype": "Small Text",
-   "label": "Example Cleaned IDs",
-   "read_only": 1
   },
   {
    "default": "3",
    "fieldname": "maximum_no_of_attempts_for_commands",
    "fieldtype": "Int",
    "label": "Maximum No of Attempts for Commands"
-  },
-  {
-   "fieldname": "section_break_ajkm",
-   "fieldtype": "Section Break"
   },
   {
    "default": "0",
@@ -86,19 +52,9 @@
    "label": "Do Not Skip Unknown Employee Checkin"
   },
   {
-   "fieldname": "column_break_aprg",
-   "fieldtype": "Column Break"
-  },
-  {
    "fieldname": "listener_section",
    "fieldtype": "Section Break",
    "label": "Listener"
-  },
-  {
-   "default": "0",
-   "fieldname": "listener_enabled",
-   "fieldtype": "Check",
-   "label": "Listener Enabled"
   },
   {
    "fieldname": "listener_status",
@@ -134,7 +90,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-06-11 21:25:21.015763",
+ "modified": "2025-07-17 14:30:25.738989",
  "modified_by": "Administrator",
  "module": "Biometric Integration",
  "name": "Biometric Integration Settings",

@@ -27,20 +27,11 @@ def get_device_employee_id(employee_id: str) -> str | None:
         return None
     settings = frappe.get_cached_doc("Biometric Integration Settings")
     try:
-        if settings.employee_id_mapping_method == "Use Device ID Field":
-            device_employee_id = frappe.get_value("Employee", employee_id, settings.device_id_field)
-            if not device_employee_id:
-                frappe.log_error(title="Device ID Not Found", message=f"Could not find value in field '{settings.device_id_field}'.", reference_doctype="Employee", reference_name=employee_id)
-                return None
-            return device_employee_id
-        elif settings.employee_id_mapping_method == "Clean Employee ID with Regex":
-            if not settings.clean_id_regex:
-                frappe.log_error(title="Regex Not Configured", message="Employee ID mapping method is 'Clean ID with Regex' but no regex is provided in settings.")
-                return None
-            return re.sub(settings.clean_id_regex, "", employee_id)
-        else:
-            frappe.log_error(title="Unsupported Mapping Method", message=f"Unsupported mapping method: {settings.employee_id_mapping_method}")
+        device_employee_id = frappe.get_value("Employee", employee_id, settings.device_id_field or "attendance_device_id")
+        if not device_employee_id:
+            frappe.log_error(title="Device ID Not Found", message=f"Could not find value in field '{settings.device_id_field}'.", reference_doctype="Employee", reference_name=employee_id)
             return None
+        return device_employee_id
     except Exception:
         frappe.log_error(title="ID Mapping Exception", message=frappe.get_traceback(), reference_doctype="Employee", reference_name=employee_id)
         return None
@@ -52,21 +43,11 @@ def get_erp_employee_id(device_employee_id: str) -> str | None:
         return None
     settings = frappe.get_cached_doc("Biometric Integration Settings")
     try:
-        if settings.employee_id_mapping_method == "Use Device ID Field":
-            erp_employee_id = frappe.get_value("Employee", {settings.device_id_field: device_employee_id}, "name")
-            if not erp_employee_id:
-                frappe.log_error(title="Employee Not Found by Device ID", message=f"No Employee found with Device ID '{device_employee_id}' in field '{settings.device_id_field}'.")
-                return None
-            return erp_employee_id
-        elif settings.employee_id_mapping_method == "Clean Employee ID with Regex":
-            erp_employee_id = frappe.get_value("Employee", {"name": device_employee_id}, "name")
-            if not erp_employee_id:
-                frappe.log_error(title="Employee Not Found by Cleaned ID", message=f"No Employee found with name matching the cleaned ID '{device_employee_id}'.")
-                return None
-            return erp_employee_id
-        else:
-            frappe.log_error(title="Unsupported Mapping Method", message=f"Unsupported mapping method: {settings.employee_id_mapping_method}")
+        erp_employee_id = frappe.get_value("Employee", {(settings.device_id_field or "attendance_device_id"): device_employee_id}, "name")
+        if not erp_employee_id:
+            frappe.log_error(title="Employee Not Found by Device ID", message=f"No Employee found with Device ID '{device_employee_id}' in field '{settings.device_id_field}'.")
             return None
+        return erp_employee_id
     except Exception:
         frappe.log_error(title="ID Mapping Exception", message=frappe.get_traceback())
         return None

@@ -169,11 +169,11 @@ def _fail(msg: str) -> Reply:
 def _handle_realtime_glog(payload: dict, headers: Dict[str, str], raw: bytes) -> Reply:
     try:
         user_id = int(payload["user_id"])
-        ts = datetime.strptime(payload["io_time"], "%Y%m%d%H%M%S")
+        ts = datetime.strptime(payload["io_time"], "%Y-%m-%d %H:%M:%S")
         log_type = "IN" if payload.get("io_mode") == 1 else "OUT"
         ok = create_employee_checkin(
             employee_field_value=user_id,
-            timestamp=ts.strftime("%Y-%m-%d %H:%M:%S"),
+            timestamp=ts,
             device_id=headers.get("dev_id"),
             log_type=log_type,
         )

@@ -7,7 +7,7 @@ from biometric_integration.biometric_integration.doctype.biometric_integration_s
 
 def create_employee_checkin(
     employee_field_value: str,
-    timestamp: str,
+    timestamp: datetime,
     device_id: str | None = None,
     log_type: str | None = None
 ) -> bool:
@@ -27,7 +27,7 @@ def create_employee_checkin(
         checkin = frappe.new_doc("Employee Checkin")
         checkin.employee = employee_id
         checkin.log_type = log_type
-        checkin.time = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+        checkin.time = timestamp
         checkin.device_id = device_id
 
         checkin.insert(ignore_mandatory=True if not employee_id else False, ignore_permissions=True)

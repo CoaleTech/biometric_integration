@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 # Use full paths for robust imports as required by the Frappe framework.
 from biometric_integration.services.ebkn_processor import handle_ebkn
 from biometric_integration.services.zkteco_processor import handle_zkteco
-from biometric_integration.services.logger import logger # Import the centralized logger
+from biometric_integration.services.logger import logger
 
 # --- Header Transformation Map ---
 # Provides a compatibility layer for Nginx, which may alter header names.
@@ -31,8 +31,8 @@ def handle_request():
 
     original_uri = request.headers.get('X-Original-Request-URI', '/')
     parsed_path = urlparse(original_uri).path
-
-    logger.info(f"Request from {request.headers.get('X-Forwarded-For', request.remote_addr)} Path: '{parsed_path}' Headers: {dict(request.headers)}")
+    
+    remote_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
 
     try:
         frappe.set_user("Administrator")
@@ -49,6 +49,7 @@ def handle_request():
             logger.warning(f"No registered handler for path: {parsed_path}")
             return Response(f"No handler for path: {parsed_path}", status=404)
 
+        # Reconstruct headers: Copy all original headers, then alter/add specific ones.
         reconstructed_headers = dict(request.headers)
         if is_ebkn:
             for nginx_header, original_header in NGINX_TO_ORIGINAL_HEADERS.items():
@@ -57,31 +58,28 @@ def handle_request():
 
         raw_body = request.get_data(cache=False)
         
-        # Execute the handler
-        handler_output = handler(request, raw_body, reconstructed_headers)
+        # SIMPLIFIED: Call all handlers with the same, consistent signature.
+        # The handlers themselves will decide which arguments they need to use.
+        handler_output = handler(request, raw_body, reconstructed_headers, parsed_path)
 
         # --- RESPONSE ADAPTER ---
-        # This block correctly handles the different return types from each processor.
         if is_ebkn and isinstance(handler_output, tuple):
-            # The EBKN handler returns a tuple (body, status, headers).
-            # We must construct a proper Response object from it.
             body, status, headers = handler_output
             response = Response(body, status=status, headers=headers, content_type='application/octet-stream')
         elif isinstance(handler_output, Response):
-            # The ZKTeco handler already returns a complete Response object.
             response = handler_output
         else:
-            # Fallback for unexpected return types.
             logger.error(f"Handler for {parsed_path} returned an invalid type: {type(handler_output)}")
             return Response("Internal Server Error: Invalid handler response", status=500)
-
-        logger.info(f"Response for {parsed_path}: Status: {response.status_code} Headers: {dict(response.headers)}")
+        
+        if response.status_code != 200 :
+            logger.info(f"Request from {remote_ip} for path '{parsed_path}'")
+            logger.info(f"Response for {parsed_path}: Status: {response.status_code}")
         return response
 
     except Exception as e:
-        logger.error(f"Error handling request for path {parsed_path}", exc_info=True)
+        frappe.log_error(title=f"Error handling request for path {parsed_path}", message=frappe.get_traceback())
         return Response("Internal Server Error", status=500)
     finally:
         frappe.set_user(original_user or "Guest")
         frappe.db.commit()
-
