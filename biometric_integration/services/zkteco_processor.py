@@ -52,7 +52,7 @@ Delay=10
 TransTimes=00:00;14:05
 TransInterval=1
 TransFlag=TransData AttLog OpLog AttPhoto EnrollUser ChgUser EnrollFP ChgFP UserPic
-TimeZone=7
+TimeZone=6
 Realtime=1
 Encrypt=None
 """
