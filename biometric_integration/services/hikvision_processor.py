@@ -316,3 +316,6 @@ def scheduled_hikvision_sync():
     except Exception as e:
         logger.error(f"Error in scheduled Hikvision sync: {str(e)}")
         frappe.log_error(title="Scheduled Hikvision Sync Error", message=frappe.get_traceback())
+
+
+        ## Hikvision processor
