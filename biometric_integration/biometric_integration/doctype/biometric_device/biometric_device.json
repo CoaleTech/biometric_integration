@@ -12,6 +12,10 @@
   "device_id",
   "device_ip",
   "device_port",
+  "username",
+  "password",
+  "sync_start_date_time",
+  "sync_end_date_time",
   "column_break_iulc",
   "disabled",
   "has_pending_command",
@@ -47,7 +51,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Brand",
-   "options": "\nZKTeco\nSuprema\nEBKN",
+   "options": "\nZKTeco\nSuprema\nEBKN\nHikvision",
    "reqd": 1
   },
   {
@@ -63,13 +67,41 @@
    "fieldname": "device_ip",
    "fieldtype": "Data",
    "label": "Device IP",
-   "mandatory_depends_on": "eval:doc.brand == \"Suprema\""
+   "mandatory_depends_on": "eval:doc.brand == \"Suprema\" || doc.brand == \"Hikvision\""
   },
   {
    "fieldname": "device_port",
    "fieldtype": "Data",
    "label": "Device Port",
    "mandatory_depends_on": "eval:doc.brand == \"Suprema\""
+  },
+  {
+   "depends_on": "eval:doc.brand == \"Hikvision\"",
+   "fieldname": "username",
+   "fieldtype": "Data",
+   "label": "Username",
+   "mandatory_depends_on": "eval:doc.brand == \"Hikvision\""
+  },
+  {
+   "depends_on": "eval:doc.brand == \"Hikvision\"",
+   "fieldname": "password",
+   "fieldtype": "Password",
+   "label": "Password",
+   "mandatory_depends_on": "eval:doc.brand == \"Hikvision\""
+  },
+  {
+   "depends_on": "eval:doc.brand == \"Hikvision\"",
+   "fieldname": "sync_start_date_time",
+   "fieldtype": "Datetime",
+   "label": "Sync Start Date Time",
+   "mandatory_depends_on": "eval:doc.brand == \"Hikvision\""
+  },
+  {
+   "depends_on": "eval:doc.brand == \"Hikvision\"",
+   "fieldname": "sync_end_date_time",
+   "fieldtype": "Datetime",
+   "label": "Sync End Date Time",
+   "mandatory_depends_on": "eval:doc.brand == \"Hikvision\""
   },
   {
    "fieldname": "column_break_iulc",
