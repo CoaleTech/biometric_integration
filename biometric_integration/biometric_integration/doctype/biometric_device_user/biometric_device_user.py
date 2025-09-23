@@ -17,7 +17,10 @@ from biometric_integration.biometric_integration.doctype.biometric_device_comman
 _BRAND_BLOB_FIELD: Dict[str, str] = {
     "ZKTeco":  "zkteco_enroll_data",
     "EBKN":    "ebkn_enroll_data",
-    # "Suprema": "suprema_enroll_data", # Example for future expansion
+    "Hikvision": "hikvision_enroll_data",
+    "Suprema": "suprema_enroll_data", 
+    
+    # Example for future expansion
 }
 
 # --- Public Helper Functions ---

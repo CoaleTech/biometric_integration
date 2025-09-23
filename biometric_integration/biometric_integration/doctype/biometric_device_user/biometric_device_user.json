@@ -77,6 +77,11 @@
    "label": "Suprema Enroll Data"
   },
   {
+   "fieldname": "hikvision_enroll_data",
+   "fieldtype": "Attach",
+   "label": "Hikvision Enroll Data"
+  },
+  {
    "fetch_from": "employee.employee_name",
    "fieldname": "employee_name",
    "fieldtype": "Data",

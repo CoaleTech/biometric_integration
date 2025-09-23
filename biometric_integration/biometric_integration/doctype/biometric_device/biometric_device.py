@@ -16,6 +16,7 @@ _BRAND_BLOB_FIELD: Dict[str, str] = {
     "EBKN": "ebkn_enroll_data",
     "ZKTeco": "zkteco_enroll_data",
     "Suprema": "suprema_enroll_data",
+    "Hikvision": "hikvision_enroll_data",
 }
 
 def _active_users_with_blob(brand: str) -> List[str]:

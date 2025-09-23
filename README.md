@@ -2,6 +2,34 @@
 
 A Frappe app for seamless integration with popular biometric attendance and access control devices. This app provides a robust, centralized architecture to handle real-time data from multiple device brands, including EBKN and ZKTeco.
 
+## Documentation
+
+📚 **Complete Documentation Available:**
+
+- **[Setup & Usage Guide](BIOMETRIC_INTEGRATION_GUIDE.md)** - Complete setup, configuration, and operational guide
+- **[CLI Commands](CLI_COMMANDS.md)** - Detailed command-line interface documentation
+- **[Doctypes Reference](DOCTYPES.md)** - Complete doctype documentation and configuration
+- **[Device Configuration](DEVICE_CONFIGURATION.md)** - Brand-specific device setup instructions
+- **[Testing Guide](TESTING_GUIDE.md)** - Comprehensive testing procedures and scripts
+
+## Quick Start
+
+1. **Install the App**:
+   ```bash
+   bench get-app https://github.com/KhaledBinAmir/biometric_integration
+   bench --site your_site install-app biometric_integration
+   ```
+
+2. **Enable Listener**:
+   ```bash
+   bench --site your_site biometric-listener enable --port 8998
+   ```
+
+3. **Configure Devices**:
+   - Point devices to: `http://your_server_ip:8998`
+   - Create device records in ERPNext
+   - Set up users and enrollment data
+
 ## Project Status
 
 * **EBKN Integration:** ✅ Stable and fully functional. Supports real-time attendance logs and command processing.

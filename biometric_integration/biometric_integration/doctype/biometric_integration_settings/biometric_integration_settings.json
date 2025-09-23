@@ -81,6 +81,11 @@
    "label": "EBKN Webhook URL"
   },
   {
+   "fieldname": "hikvision_webhook_url",
+   "fieldtype": "Read Only",
+   "label": "Hikvision Webhook URL"
+  },
+  {
    "fieldname": "suprema_webhook_url",
    "fieldtype": "Read Only",
    "label": "Suprema Webhook URL"

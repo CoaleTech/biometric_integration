@@ -58,6 +58,8 @@ def _build_command_payload(cmd_doc: frappe.Document) -> Optional[Union[str, dict
             return _build_ebkn_payload(cmd_doc, user_doc)
         elif cmd_doc.brand == "ZKTeco":
             return _build_zkteco_command(cmd_doc, user_doc)
+        elif cmd_doc.brand == "Hikvision":
+            return _build_hikvision_command(cmd_doc, user_doc)
         else:
             raise ValueError(f"Unsupported brand: {cmd_doc.brand}")
 
@@ -110,6 +112,41 @@ def _build_zkteco_command(cmd_doc: frappe.Document, user_doc: frappe.Document) -
         fp_data_cmd = f"C:{cmd_id}:DATA UPDATE FINGERPRINT PIN={user_pin}\tFID=0\tSize={len(blob)}\tValid=1\tTMP={template_b64}"
         return "\n".join([user_info_cmd, fp_data_cmd])
         
+    return None
+
+def _build_hikvision_command(cmd_doc: frappe.Document, user_doc: frappe.Document) -> Optional[dict]:
+    """Builds a command payload dictionary for the Hikvision brand."""
+    cmd_type = cmd_doc.command_type
+
+    if cmd_type == "Delete User":
+        return {
+            "Command": "DeleteUser",
+            "Parameters": {
+                "EmployeeNo": str(user_doc.user_id)
+            }
+        }
+
+    if cmd_type == "Get Enroll Data":
+        return {
+            "Command": "GetUserInfo",
+            "Parameters": {
+                "EmployeeNo": str(user_doc.user_id)
+            }
+        }
+
+    if cmd_type == "Enroll User":
+        blob = _load_blob(user_doc.hikvision_enroll_data)
+        if not blob:
+            raise FileNotFoundError(f"Hikvision enrollment data not found for user {user_doc.name}")
+        return {
+            "Command": "SetUserInfo",
+            "Parameters": {
+                "EmployeeNo": str(user_doc.user_id),
+                "Name": user_doc.employee_name,
+                "EnrollData": base64.b64encode(blob).decode('utf-8')
+            }
+        }
+
     return None
 
 # --- Helper Functions ---

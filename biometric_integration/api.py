@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 # Use full paths for robust imports as required by the Frappe framework.
 from biometric_integration.services.ebkn_processor import handle_ebkn
 from biometric_integration.services.zkteco_processor import handle_zkteco
+from biometric_integration.services.hikvision_processor import sync_hikvision_attendance, scheduled_hikvision_sync
 from biometric_integration.services.logger import logger
 
 # --- Header Transformation Map ---
@@ -83,3 +84,21 @@ def handle_request():
     finally:
         frappe.set_user(original_user or "Guest")
         frappe.db.commit()
+@frappe.whitelist()
+def sync_hikvision_device():
+    """
+    API endpoint to manually sync a specific Hikvision device.
+    """
+    data = frappe.local.request.get_json() or {}
+    device_serial = data.get('device_serial')
+    start_time = data.get('start_time')
+    end_time = data.get('end_time')
+    
+    return sync_hikvision_attendance(device_serial, start_time, end_time)
+
+@frappe.whitelist()
+def sync_all_hikvision_devices():
+    """
+    API endpoint to sync all active Hikvision devices.
+    """
+    return scheduled_hikvision_sync()    

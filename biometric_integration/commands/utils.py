@@ -3,6 +3,7 @@ import re
 import subprocess
 import json
 import urllib.request
+import platform
 import click
 import frappe
 from frappe.utils import get_bench_path, get_url, get_site_path
@@ -77,7 +78,23 @@ def _reload_nginx():
     """Safely reloads the NGINX service."""
     try:
         click.secho("Attempting to reload NGINX...", fg="yellow")
-        subprocess.run(["sudo", "service", "nginx", "reload"], check=True, capture_output=True, text=True)
+
+        # Detect OS and use appropriate reload command
+        system = platform.system().lower()
+        if system == "linux":
+            # Linux systems typically use systemctl or service
+            try:
+                subprocess.run(["sudo", "systemctl", "reload", "nginx"], check=True, capture_output=True, text=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                # Fallback to service command
+                subprocess.run(["sudo", "service", "nginx", "reload"], check=True, capture_output=True, text=True)
+        elif system == "darwin":  # macOS
+            # macOS with Homebrew nginx
+            subprocess.run(["sudo", "nginx", "-s", "reload"], check=True, capture_output=True, text=True)
+        else:
+            # Other systems - try nginx -s reload
+            subprocess.run(["sudo", "nginx", "-s", "reload"], check=True, capture_output=True, text=True)
+
         click.secho("NGINX reloaded successfully.", fg="green")
         return True, ""
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
@@ -152,7 +169,8 @@ def get_status_logic(site):
             "paths": {
                 "ebkn": f"http://{path_ip}:{port}/ebkn",
                 "suprema": f"http://{path_ip}:{port}",
-                "zkteco": f"http://{path_ip}:{port}"
+                "zkteco": f"http://{path_ip}:{port}",
+                "hikvision": f"http://{path_ip}:{port}",
             },
         }
     else:
